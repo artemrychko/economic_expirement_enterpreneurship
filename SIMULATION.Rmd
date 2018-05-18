@@ -1,0 +1,211 @@
+---
+title: "Coursework"
+author: "Artem Rychko"
+date: '22 апреля 2018 г '
+output: pdf_document
+---
+
+
+
+
+Intro:
+In economy of small people group two types of activity exist be entepreneur or employee. Also economy has two types of occupation agriculture and theater. Every human should choose  what type occupational and activity is preferable pair. 
+
+
+The idea of distribution abilities is give examinee nominal and rangs of their abilities in this group of testee.
+
+
+
+
+We consider the next system of economy:
+1) Utility function of each examinee. (function)
+2) Price formula for i product with dependance of another one. (function)
+3) Quality production of firm. (function)
+4) Budget constraint of each examinee. (function)
+
+
+1) Money distribution [0 - 10] 
+2) Knoweledge of industry [0 - 1]
+3) Entr. Ability distribution [0 -1]
+4) Productivity (universal for industry) [5 - 10]
+
+
+
+
+Goal of game is not die and get more money than others
+
+Testing Hyphothesis: 
+1) If entrepreneur has opportuinity to earn alone / in another entrepreneur thus he will choose be necessity entrepreneur / employee 
+2) Introduction or increasing of minimum wage brings to emergance more number of necessity entrepreneurship.
+3) A small demand of all goods or one type brings to increase a quantity of necessity entrepreneurship.
+4) Trust in future success gives to human stay a necessity entrepreneurship.
+
+### Every created product will be consume
+
+#1 (a, b, c) - coefs
+Utility = a*x + b*y
+
+#2
+price_X = Y/X*100
+price_Y = X/Y*100
+
+#3
+Quality = entr*knwldg*(firm_productivities)
+firm_productivities = sum(filter(df, 'company' == i)$productivity)
+filter(df, 'company' == i)$productivity = df$knoweledge*df$productivity
+
+#4
+Constraint = price_X*x + price_Y*y = income
+
+#5 
+income = ifelse(human == 'ent', profit, df[human]$salary) 
+profit = (Quality_x*price_X + Quality_y*price_Y) - firm_salaries
+firm_salaries = sum(filter(df, 'company' == i)$salary)
+
+
+
+
+
+```{r}
+library(GGally)
+library(dplyr)
+```
+
+
+
+Simulation
+Industries:
+a = 1
+b = 2
+```{r}
+set.seed(2018)
+
+# create people's characteristics
+n = 30
+knows_a = sample(c(0:10)/10, n, replace = TRUE)
+knows_b = sample(c(0:10)/10, n, replace = TRUE)
+abils = sample(c(0:10)/10, n, replace = TRUE)
+cashes = sample(c(0:10), n, replace = TRUE)
+prods = sample(c(5:10), n, replace = TRUE)
+df = data.frame('productivity' = prods, 'ability' = abils, 'cash' = cashes, 'knoweledge_a' = knows_a, 'knoweledge_b' = knows_b)
+df$knoweledge = apply(select(df, knoweledge_a, knoweledge_b), 1, FUN=max)
+df$industry = ifelse(df$knoweledge_a > df$knoweledge_b, 1, 2)
+
+
+summary(df)
+ggpairs(df)
+```
+
+
+#1 STEP: Examinee choose to be or not to be enterpreneur
+Choice1:
+entrepreneuer = 1
+employee = 0
+```{r}
+border = quantile(df$ability*df$knoweledge,probs = 0.7)
+df$choice1 = ifelse(df$ability*df$knoweledge >= border, 1, 0)
+e1 = filter(df, choice1 == 1)
+e1$ent_id = c(1:length(e1$productivity))
+
+e0 = df[df$choice1 == 0, ]
+e0$emp_id = c(1:length(e0$productivity))
+  
+hist(df$ability*df$knoweledge)
+```
+
+
+
+#2 STEP: Employees and enterpreneurs creates agreeaments
+```{r}
+set.seed(2018)
+
+e0$choice2 = 99
+e0[e0$industry == 1, ]$choice2 = sample(e1[e1$industry == 1, ]$ent_id, length(e0[e0$industry == 1, ]$productivity), replace = TRUE)
+e0[e0$industry == 2, ]$choice2 = sample(e1[e1$industry == 2, ]$ent_id, length(e0[e0$industry == 2, ]$productivity), replace = TRUE)
+
+
+as.matrix(data.frame(e0$emp_id, e0$choice2))
+```
+#2 STEP: results of round
+```{r}
+
+
+#Quantity <- vector("list", 9)
+#firm_n <- vector("list", 9)
+e1$Quantity = 0
+e1$size = 0
+for(i in 1:9){
+    firm_prod = sum(filter(e0, choice2 == i)$productivity*filter(e0, choice2 == i)$knoweledge) + filter(e1, ent_id == i)$productivity*filter(e1, ent_id == i)$knoweledge
+    firm_n_ = length(filter(e0, choice2 == i)$productivity)
+    Quantity_ = filter(e1, ent_id == i)$ability*(firm_prod)
+    e1$Quantity[i] <- Quantity_
+    e1$size[i] <- firm_n_+1
+}
+X = sum(filter(e1, industry == 1)$Quantity)
+Y = sum(filter(e1, industry == 2)$Quantity)
+print(paste('X = ', X))
+print(paste('Y = ', Y))
+
+price_X = Y/X
+price_Y = X/Y
+print(paste('price_X =', price_X))
+print(paste('price_Y =', price_Y))
+
+
+e1$income = 0
+e1[e1$industry == 1, ]$income = e1[e1$industry == 1, ]$Quantity*price_X
+e1[e1$industry == 2, ]$income = e1[e1$industry == 2, ]$Quantity*price_Y
+
+e1$profit = 0.2*e1$income
+
+
+
+e0$income = 0
+for(i in 1:21){
+    #pr = e0[e0$emp_id == i, ]$knoweledge * e0[e0$emp_id == i, ]$productivity 
+    f = e0[e0$emp_id == i, ]$choice2
+    e0[e0$emp_id == i, ]$income = (0.8*e1[e1$ent_id == f, ]$income)/e1[e1$ent_id == f, ]$size
+}
+
+```
+
+
+
+
+#3 STEP: Examinee rechoose their decision 
+Check first hypo
+
+```{r}
+df1 = bind_rows(e1, e0)
+#they will not prognose change in prices
+
+df1$prr = df1$productivity * df1$knoweledge * df1$ability
+df1$prognose = 0
+for(i in 1:30){
+  df1$prognose[i] = ifelse(df1$industry == 1, price_X*df1$prr, price_Y*df1$prr)  
+}
+
+df1$necessity = df1$prognose - df1$income
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+THE IMPACT OF THE GLOBAL CRISIS ON ENTREPRENEURIAL ACTIVITY
+http://cesmaa.org/Docs/JAES%20Winter%20XII%208(54)2017_online.pdf#page=18
+
